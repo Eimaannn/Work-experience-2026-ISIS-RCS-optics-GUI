@@ -47,7 +47,7 @@ else:
     )
     measured_bpm_table = normalise_bpm_measurements(raw_measured_orbit)
 
-measured_bpm_table
+measured_bpm_table = measured_bpm_table.copy()
 
 from optics_gui.snapshot import copy_snapshot_config
 

@@ -1,4 +1,5 @@
 # Imports
+import colorsys
 from pathlib import Path
  
 import streamlit as st
@@ -11,7 +12,81 @@ from nominal_orbit_model import repo_root, orbit_base_config
 from optics_gui.snapshot import build_machine_snapshot, copy_snapshot_config
 from optics_gui.orbit_correction import bpm_measurements_from_twiss
  
-# Website formatting
+st.set_page_config(page_title="Orbit models", layout="wide")
+ 
+ 
+# ---------------------------------------------------------------------------
+# Colour theme: a single hue slider drives every colour on the page
+# ---------------------------------------------------------------------------
+def hsl_to_hex(hue_deg, saturation, lightness):
+    """Convert HSL (hue in degrees, saturation/lightness in 0-1) to a hex colour."""
+    r, g, b = colorsys.hls_to_rgb((hue_deg % 360) / 360, lightness, saturation)
+    return "#{:02x}{:02x}{:02x}".format(round(r * 255), round(g * 255), round(b * 255))
+ 
+ 
+def build_theme(hue_deg):
+    return {
+        "primary": hsl_to_hex(hue_deg, 0.60, 0.42),
+        "accent": hsl_to_hex(hue_deg + 40, 0.65, 0.55),
+        "page_bg": hsl_to_hex(hue_deg, 0.35, 0.97),
+        "sidebar_bg": hsl_to_hex(hue_deg, 0.30, 0.93),
+        "card_bg": hsl_to_hex(hue_deg, 0.25, 0.99),
+    }
+ 
+ 
+def apply_theme_css(theme):
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-color: {theme['page_bg']};
+        }}
+        section[data-testid="stSidebar"] {{
+            background-color: {theme['sidebar_bg']};
+        }}
+        h1, h2, h3 {{
+            color: {theme['primary']};
+        }}
+        div[data-testid="stVerticalBlock"] > div:has(> div.stDataFrame),
+        div[data-testid="stMetric"] {{
+            background-color: {theme['card_bg']};
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+        }}
+        div.stButton > button {{
+            background-color: {theme['primary']};
+            color: white;
+            border: none;
+        }}
+        div.stButton > button:hover {{
+            background-color: {theme['accent']};
+            color: white;
+        }}
+        /* Slider handle/track colour. Selector names come from Streamlit's
+           internal component markup and may shift between versions. */
+        div[data-baseweb="slider"] div[role="slider"] {{
+            background-color: {theme['primary']} !important;
+        }}
+        div[data-baseweb="slider"] > div > div {{
+            background-color: {theme['accent']} !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+ 
+ 
+st.sidebar.header("Appearance")
+theme_hue = st.sidebar.slider(
+    "Theme colour",
+    min_value=0,
+    max_value=360,
+    value=210,
+    help="Pick an accent hue (0-360 on the colour wheel) for the whole page.",
+)
+theme = build_theme(theme_hue)
+apply_theme_css(theme)
+ 
 st.title("Orbit GUI")
  
 # ---------------------------------------------------------------------------
@@ -98,12 +173,18 @@ def get_measured_bpm_table(cycle_time_ms, requested_qx, requested_qy):
  
 # ---------------------------------------------------------------------------
 # Plotting functions per mode
+#
+# Line colours are drawn from the same theme as the rest of the page, so the
+# x/y traces shift together with the hue slider.
 # ---------------------------------------------------------------------------
+line_colors = [theme["primary"], theme["accent"]]
+ 
+ 
 def nominal_orbit_plot():
     st.write("The ideal closed orbit with no errors, at the chosen cycle time and tune.")
     snapshot = get_nominal_orbit_snapshot(cycle_time_ms, requested_qx, requested_qy)
     st.dataframe(snapshot.table("orbit_summary"))
-    st.line_chart(data=snapshot.table("orbit"), y=["x_mm", "y_mm"], x="s")
+    st.line_chart(data=snapshot.table("orbit"), y=["x_mm", "y_mm"], x="s", color=line_colors)
  
  
 def error_table_orbit_plot():
@@ -115,7 +196,7 @@ def error_table_orbit_plot():
     )
     snapshot = get_error_table_orbit_snapshot(cycle_time_ms, requested_qx, requested_qy)
     st.dataframe(snapshot.table("orbit_summary"))
-    st.line_chart(data=snapshot.table("orbit"), y=["x_mm", "y_mm"], x="s")
+    st.line_chart(data=snapshot.table("orbit"), y=["x_mm", "y_mm"], x="s", color=line_colors)
  
  
 def measured_orbit_plot():
@@ -124,7 +205,7 @@ def measured_orbit_plot():
         "chosen cycle time and tune."
     )
     bpm_table = get_measured_bpm_table(cycle_time_ms, requested_qx, requested_qy)
-    st.line_chart(data=bpm_table, x="s", y="closed_orbit_mm")
+    st.line_chart(data=bpm_table, x="s", y="closed_orbit_mm", color=[theme["primary"]])
  
  
 orbit_mode_selection = st.selectbox(
